@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.CommandLine;
 
 namespace Microsoft.DotNet.ImageBuilder
 {
@@ -44,51 +45,70 @@ Options:
         {
             Options options = new Options();
 
-            for (int i = 0; i < args.Length; i++)
+            ArgumentSyntax.Parse(args, syntax =>
             {
-                string arg = args[i];
-                if (string.Equals(arg, "--command", StringComparison.Ordinal))
-                {
-                    string commandType = GetArgValue(args, ref i, "command");
-                    options.Command = (CommandType)Enum.Parse(typeof(CommandType), commandType, true);
-                }
-                else if (string.Equals(arg, "--dry-run", StringComparison.Ordinal))
-                {
-                    options.IsDryRun = true;
-                }
-                else if (string.Equals(arg, "-h", StringComparison.Ordinal) || string.Equals(arg, "--help", StringComparison.Ordinal))
-                {
-                    options.IsHelpRequest = true;
-                }
-                else if (string.Equals(arg, "--manifest", StringComparison.Ordinal))
-                {
-                    options.Manifest = GetArgValue(args, ref i, "manifest");
-                }
-                else if (string.Equals(arg, "--push", StringComparison.Ordinal))
-                {
-                    options.IsPushEnabled = true;
-                }
-                else if (string.Equals(arg, "--password", StringComparison.Ordinal))
-                {
-                    options.Password = GetArgValue(args, ref i, "password");
-                }
-                else if (string.Equals(arg, "--username", StringComparison.Ordinal))
-                {
-                    options.Username = GetArgValue(args, ref i, "username");
-                }
-                else if (string.Equals(arg, "--skip-pulling", StringComparison.Ordinal))
-                {
-                    options.IsSkipPullingEnabled = true;
-                }
-                else if (string.Equals(arg, "--skip-test", StringComparison.Ordinal))
-                {
-                    options.IsTestRunDisabled = true;
-                }
-                else
-                {
-                    throw new ArgumentException($"Unknown argument: '{arg}'{Environment.NewLine}{Usage}");
-                }
-            }
+                // bool isDryRun = false;
+                // syntax.DefineOption("dry-run", ref isDryRun, "Dry run of what images get built and order they would get built in");
+                // options.IsDryRun = isDryRun;
+
+                CommandType command = default(CommandType);
+                syntax.DefineCommand("build", ref command, CommandType.Build, "Build the images");
+                bool skipPulling = false;
+                syntax.DefineOption("skip-pulling", ref skipPulling, "Skip explicitly pulling the base images of the Dockerfiles");
+                options.IsSkipPullingEnabled=skipPulling;
+
+                syntax.DefineCommand("PublishManifest", ref command, CommandType.Build, "Publishes the manifest");
+                bool dude = false;
+                syntax.DefineOption("skip-pulling", ref dude, "Skip explicitly pulling the base images of the Dockerfiles");
+                options.IsSkipPullingEnabled=skipPulling;
+
+            });
+
+            // for (int i = 0; i < args.Length; i++)
+            // {
+            //     string arg = args[i];
+            //     if (string.Equals(arg, "--command", StringComparison.Ordinal))
+            //     {
+            //         string commandType = GetArgValue(args, ref i, "command");
+            //         options.Command = (CommandType)Enum.Parse(typeof(CommandType), commandType, true);
+            //     }
+            //     else if (string.Equals(arg, "--dry-run", StringComparison.Ordinal))
+            //     {
+            //         options.IsDryRun = true;
+            //     }
+            //     else if (string.Equals(arg, "-h", StringComparison.Ordinal) || string.Equals(arg, "--help", StringComparison.Ordinal))
+            //     {
+            //         options.IsHelpRequest = true;
+            //     }
+            //     else if (string.Equals(arg, "--manifest", StringComparison.Ordinal))
+            //     {
+            //         options.Manifest = GetArgValue(args, ref i, "manifest");
+            //     }
+            //     else if (string.Equals(arg, "--push", StringComparison.Ordinal))
+            //     {
+            //         options.IsPushEnabled = true;
+            //     }
+            //     else if (string.Equals(arg, "--password", StringComparison.Ordinal))
+            //     {
+            //         options.Password = GetArgValue(args, ref i, "password");
+            //     }
+            //     else if (string.Equals(arg, "--username", StringComparison.Ordinal))
+            //     {
+            //         options.Username = GetArgValue(args, ref i, "username");
+            //     }
+            //     else if (string.Equals(arg, "--skip-pulling", StringComparison.Ordinal))
+            //     {
+            //         options.IsSkipPullingEnabled = true;
+            //     }
+            //     else if (string.Equals(arg, "--skip-test", StringComparison.Ordinal))
+            //     {
+            //         options.IsTestRunDisabled = true;
+            //     }
+            //     else
+            //     {
+            //         throw new ArgumentException($"Unknown argument: '{arg}'{Environment.NewLine}{Usage}");
+            //     }
+            // }
 
             return options;
         }
