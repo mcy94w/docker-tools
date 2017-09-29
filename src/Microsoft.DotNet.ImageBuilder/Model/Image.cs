@@ -14,7 +14,7 @@ namespace Microsoft.DotNet.ImageBuilder.Model
 
         public int ReadmeOrder { get; set; }
 
-        public IDictionary<string, Tag> SharedTags { get; set; }
+        public IDictionary<string, SharedTag> SharedTags { get; set; }
 
         public Image()
         {
