@@ -80,7 +80,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             IEnumerable<string> buildArgs = platform.BuildArgs
                 .Select(buildArg => 
                     {
-                        string buildArgValue = Utilities.SubstituteVariables(null, buildArg.Value, Manifest.GetReferenceVariableValue);
+                        string buildArgValue = Manifest.Model.SubstituteVariables(Options.Variables, buildArg.Value, Manifest.GetReferenceVariableValue);
                         return $" --build-arg {buildArg.Key}={buildArgValue}";
                     });
             return string.Join(string.Empty, buildArgs);
@@ -151,7 +151,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             {
                 Utilities.WriteHeading("TESTING IMAGES");
                 IEnumerable<string> testCommands = Manifest.TestCommands
-                    .Select(command => Utilities.SubstituteVariables(Options.TestVariables, command));
+                    .Select(command => Manifest.Model.SubstituteVariables(Options.Variables, command));
                 foreach (string command in testCommands)
                 {
                     string filename;

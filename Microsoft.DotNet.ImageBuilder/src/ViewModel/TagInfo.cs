@@ -27,7 +27,7 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
             TagInfo tagInfo = new TagInfo();
             tagInfo.Model = model;
             tagInfo.BuildContextPath = buildContextPath;
-            tagInfo.Name = Utilities.SubstituteVariables(manifest.TagVariables, name, tagInfo.GetSubstituteValue);
+            tagInfo.Name = manifest.SubstituteVariables(null, name, tagInfo.GetSubstituteValue);
             tagInfo.FullyQualifiedName = $"{repoName}:{tagInfo.Name}";
 
             return tagInfo;
