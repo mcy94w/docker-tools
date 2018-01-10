@@ -5,6 +5,7 @@
 using Microsoft.DotNet.ImageBuilder.Model;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -20,15 +21,17 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
         public IEnumerable<string> FromImages { get; private set; }
         public Platform Model { get; private set; }
         public IEnumerable<TagInfo> Tags { get; private set; }
+        private VariableHelper VariableHelper { get; set; }
 
         private PlatformInfo()
         {
         }
 
-        public static PlatformInfo Create(Platform model, Manifest manifest, string repoName)
+        public static PlatformInfo Create(Platform model, string repoName, VariableHelper variableHelper)
         {
             PlatformInfo platformInfo = new PlatformInfo();
             platformInfo.Model = model;
+            platformInfo.VariableHelper = variableHelper;
 
             if (File.Exists(model.Dockerfile))
             {
@@ -43,12 +46,29 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
             }
 
             platformInfo.Tags = model.Tags
-                .Select(kvp => TagInfo.Create(kvp.Key, kvp.Value, manifest, repoName, platformInfo.BuildContextPath))
+                .Select(kvp => TagInfo.Create(kvp.Key, kvp.Value, repoName, variableHelper, platformInfo.BuildContextPath))
                 .ToArray();
 
             platformInfo.InitializeFromImages();
 
             return platformInfo;
+        }
+
+        public IDictionary<string, string> GetBuildArgs()
+        {
+            IDictionary<string, string> buildArgs;
+
+            if (Model.BuildArgs == null)
+            {
+                buildArgs = ImmutableDictionary<string, string>.Empty;
+            }
+            else
+            {
+                buildArgs = Model.BuildArgs
+                    .ToDictionary(kvp => kvp.Key, kvp => VariableHelper.SubstituteValues(kvp.Value));
+            }
+
+            return buildArgs;
         }
 
         private void InitializeFromImages()

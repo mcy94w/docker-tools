@@ -50,14 +50,13 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                         IEnumerable<string> platformTags = platform.Tags
                             .Select(tag => tag.FullyQualifiedName)
                             .ToArray();
-                        IEnumerable<string> allTags = image.SharedTags
-                            .Select(tag => tag.FullyQualifiedName)
-                            .Concat(platformTags);
-                        string tagArgs = $"-t {string.Join(" -t ", allTags)}";
+                        string tagArgs = GetDockerTagArgs(image, platformTags);
+                        string buildArgs = GetDockerBuildArgs(platform);
+
                         InvokeBuildHook("pre-build", platform.BuildContextPath);
                         ExecuteHelper.Execute(
                             "docker",
-                            $"build {tagArgs} -f {dockerfilePath} {platform.BuildContextPath}",
+                            $"build {tagArgs} -f {dockerfilePath}{buildArgs} {platform.BuildContextPath}",
                             Options.IsDryRun);
                         InvokeBuildHook("post-build", platform.BuildContextPath);
                         BuiltTags = BuiltTags.Concat(platformTags);
@@ -71,6 +70,21 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                     }
                 }
             }
+        }
+
+        private string GetDockerBuildArgs(PlatformInfo platform)
+        {
+            IEnumerable<string> buildArgs = platform.GetBuildArgs()
+                .Select(buildArg => $" --build-arg {buildArg.Key}={buildArg.Value}");
+            return string.Join(string.Empty, buildArgs);
+        }
+
+        private string GetDockerTagArgs(ImageInfo image, IEnumerable<string> platformTags)
+        {
+            IEnumerable<string> allTags = image.SharedTags
+                .Select(tag => tag.FullyQualifiedName)
+                .Concat(platformTags);
+            return $"-t {string.Join(" -t ", allTags)}";
         }
 
         private void InvokeBuildHook(string hookName, string buildContextPath)
@@ -96,7 +110,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 }
 
                 startInfo = new ProcessStartInfo(
-                    RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "PowerShell" : "pwsh", 
+                    RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "PowerShell" : "pwsh",
                     $"-NoProfile -File \"{scriptPath}\"");
             }
 
@@ -137,9 +151,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             if (!Options.IsTestRunDisabled)
             {
                 Utilities.WriteHeading("TESTING IMAGES");
-                IEnumerable<string> testCommands = Manifest.TestCommands
-                    .Select(command => Utilities.SubstituteVariables(Options.TestVariables, command));
-                foreach (string command in testCommands)
+                foreach (string command in Manifest.GetTestCommands())
                 {
                     string filename;
                     string args;
