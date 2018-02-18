@@ -6,13 +6,10 @@ using System;
 
 namespace Microsoft.DotNet.ImageBuilder
 {
-    public static class Utilities
+    public class ValidationException : Exception
     {
-        public static void WriteHeading(string heading)
+        public ValidationException(string message) : base(message)
         {
-            Console.WriteLine();
-            Console.WriteLine(heading);
-            Console.WriteLine(new string('-', heading.Length));
         }
     }
 }

@@ -5,7 +5,6 @@
 using Microsoft.DotNet.ImageBuilder.Model;
 using Microsoft.DotNet.ImageBuilder.ViewModel;
 using Newtonsoft.Json;
-using System;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -31,7 +30,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
         public void LoadManifest()
         {
-            Utilities.WriteHeading("READING MANIFEST");
+            Logger.WriteHeading("READING MANIFEST");
 
             string manifestJson = File.ReadAllText(Options.Manifest);
             Manifest manifestModel = JsonConvert.DeserializeObject<Manifest>(manifestJson);
@@ -40,12 +39,12 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             Manifest = ManifestInfo.Create(
                 manifestModel,
                 Options.GetManifestFilter(),
-                (Options as DockerRegistryOptions)?.RepoOwner,
+                Options.RepoOwner,
                 Options.Variables);
 
             if (Options.IsVerbose)
             {
-                Console.WriteLine(JsonConvert.SerializeObject(Manifest, Formatting.Indented));
+                Logger.WriteMessage(JsonConvert.SerializeObject(Manifest, Formatting.Indented));
             }
         }
     }

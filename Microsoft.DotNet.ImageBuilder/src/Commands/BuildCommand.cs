@@ -3,7 +3,6 @@
 // See the LICENSE file in the project root for more information.
 
 using Microsoft.DotNet.ImageBuilder.ViewModel;
-using System;
 using System.Collections.Generic;
 using System.CommandLine;
 using System.Diagnostics;
@@ -17,7 +16,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 {
     public class BuildCommand : Command<BuildOptions>
     {
-        private IEnumerable<string> BuiltTags { get; set; } = Enumerable.Empty<string>();
+        private IEnumerable<TagInfo> BuiltTags { get; set; } = Enumerable.Empty<TagInfo>();
 
         public BuildCommand() : base()
         {
@@ -27,8 +26,13 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         {
             PullBaseImages();
             BuildImages();
-            RunTests();
-            PushImages();
+
+            if (BuiltTags.Any())
+            {
+                RunTests();
+                PushImages();
+            }
+
             WriteBuildSummary();
 
             return Task.CompletedTask;
@@ -36,7 +40,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
         private void BuildImages()
         {
-            Utilities.WriteHeading("BUILDING IMAGES");
+            Logger.WriteHeading("BUILDING IMAGES");
             foreach (ImageInfo image in Manifest.ActiveImages)
             {
                 foreach (PlatformInfo platform in image.ActivePlatforms)
@@ -59,7 +63,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                             $"build {tagArgs} -f {dockerfilePath}{buildArgs} {platform.BuildContextPath}",
                             Options.IsDryRun);
                         InvokeBuildHook("post-build", platform.BuildContextPath);
-                        BuiltTags = BuiltTags.Concat(platformTags);
+                        BuiltTags = BuiltTags.Concat(platform.Tags);
                     }
                     finally
                     {
@@ -70,6 +74,8 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                     }
                 }
             }
+
+            BuiltTags = BuiltTags.ToArray();
         }
 
         private string GetDockerBuildArgs(PlatformInfo platform)
@@ -114,6 +120,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                     $"-NoProfile -File \"{scriptPath}\"");
             }
 
+            startInfo.WorkingDirectory = buildContextPath;
             ExecuteHelper.Execute(startInfo, Options.IsDryRun, $"Failed to execute build hook '{scriptPath}'");
         }
 
@@ -129,12 +136,15 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         {
             if (Options.IsPushEnabled)
             {
-                Utilities.WriteHeading("PUSHING IMAGES");
+                Logger.WriteHeading("PUSHING IMAGES");
 
                 DockerHelper.Login(Options.Username, Options.Password, Options.Server, Options.IsDryRun);
                 try
                 {
-                    foreach (string tag in BuiltTags)
+                    IEnumerable<string> pushTags = BuiltTags
+                        .Where(tag => !tag.Model.IsLocal)
+                        .Select(tag => tag.FullyQualifiedName);
+                    foreach (string tag in pushTags)
                     {
                         ExecuteHelper.ExecuteWithRetry("docker", $"push {tag}", Options.IsDryRun);
                     }
@@ -150,25 +160,34 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         {
             if (!Options.IsTestRunDisabled)
             {
-                Utilities.WriteHeading("TESTING IMAGES");
-                foreach (string command in Manifest.GetTestCommands())
+                Logger.WriteHeading("TESTING IMAGES");
+
+                IEnumerable<string> testCommands = Manifest.GetTestCommands();
+                if (testCommands.Any())
                 {
-                    string filename;
-                    string args;
-
-                    int firstSpaceIndex = command.IndexOf(' ');
-                    if (firstSpaceIndex == -1)
+                    foreach (string command in Manifest.GetTestCommands())
                     {
-                        filename = command;
-                        args = null;
-                    }
-                    else
-                    {
-                        filename = command.Substring(0, firstSpaceIndex);
-                        args = command.Substring(firstSpaceIndex + 1);
-                    }
+                        string filename;
+                        string args;
 
-                    ExecuteHelper.Execute(filename, args, Options.IsDryRun);
+                        int firstSpaceIndex = command.IndexOf(' ');
+                        if (firstSpaceIndex == -1)
+                        {
+                            filename = command;
+                            args = null;
+                        }
+                        else
+                        {
+                            filename = command.Substring(0, firstSpaceIndex);
+                            args = command.Substring(firstSpaceIndex + 1);
+                        }
+
+                        ExecuteHelper.Execute(filename, args, Options.IsDryRun);
+                    }
+                }
+                else
+                {
+                    Logger.WriteMessage("No tests found");
                 }
             }
         }
@@ -190,14 +209,14 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 {
                     Regex fromRegex = new Regex($@"FROM\s+{Regex.Escape(fromImage)}[^\S\r\n]*");
                     string newFromImage = DockerHelper.ReplaceImageOwner(fromImage, Options.RepoOwner);
-                    Console.WriteLine($"Replacing FROM `{fromImage}` with `{newFromImage}`");
+                    Logger.WriteMessage($"Replacing FROM `{fromImage}` with `{newFromImage}`");
                     dockerfileContents = fromRegex.Replace(dockerfileContents, $"FROM {newFromImage}");
                 }
 
                 // Don't overwrite the original dockerfile - write it to a new path.
                 dockerfilePath = dockerfilePath + ".temp";
-                Console.WriteLine($"Writing updated Dockerfile: {dockerfilePath}");
-                Console.WriteLine(dockerfileContents);
+                Logger.WriteMessage($"Writing updated Dockerfile: {dockerfilePath}");
+                Logger.WriteMessage(dockerfileContents);
                 File.WriteAllText(dockerfilePath, dockerfileContents);
             }
 
@@ -206,11 +225,21 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
         private void WriteBuildSummary()
         {
-            Utilities.WriteHeading("IMAGES BUILT");
-            foreach (string tag in BuiltTags)
+            Logger.WriteHeading("IMAGES BUILT");
+
+            if (BuiltTags.Any())
             {
-                Console.WriteLine(tag);
+                foreach (string tag in BuiltTags.Select(tag => tag.FullyQualifiedName))
+                {
+                    Logger.WriteMessage(tag);
+                }
             }
+            else
+            {
+                Logger.WriteMessage("No images built");
+            }
+
+            Logger.WriteMessage();
         }
     }
 }

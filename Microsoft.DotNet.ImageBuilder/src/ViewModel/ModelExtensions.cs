@@ -13,31 +13,59 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
     {
         public static void Validate(this Manifest manifest)
         {
+            ValidateCommonRepoOwner(manifest);
+
             foreach (Repo repo in manifest.Repos)
             {
                 ValidateUniqueTags(repo);
             }
         }
 
+        private static void ValidateCommonRepoOwner(Manifest manifest)
+        {
+            IEnumerable<string> distinctRepos = manifest.Repos
+                .Select(repo => DockerHelper.GetImageOwner(repo.Name))
+                .Distinct();
+            if (distinctRepos.Count() != 1)
+            {
+                throw new ValidationException(
+                    $"All repos must have a common owner: {Environment.NewLine}{string.Join(Environment.NewLine, distinctRepos)}");
+            }
+        }
+
         private static void ValidateUniqueTags(Repo repo)
         {
-            IEnumerable<string> sharedTags = repo.Images
-                .SelectMany(images => images.SharedTags?.Keys ?? Enumerable.Empty<string>());
-            IEnumerable<string> platformTags = repo.Images
+            IEnumerable<KeyValuePair<string, Tag>> sharedTags = repo.Images
+                .SelectMany(images => images.SharedTags ?? Enumerable.Empty<KeyValuePair<string, Tag>>());
+            IEnumerable<KeyValuePair<string, Tag>> platformTags = repo.Images
                 .SelectMany(image => image.Platforms)
-                .SelectMany(platform => platform.Tags.Keys);
-            IEnumerable<string> allTags = sharedTags
+                .SelectMany(platform => platform.Tags);
+            IEnumerable<KeyValuePair<string, Tag>> allTags = sharedTags
                 .Concat(platformTags)
                 .ToArray();
 
-            if (allTags.Count() != allTags.Distinct().Count())
+            IEnumerable<string> tagNames = allTags
+                .Select(kvp => kvp.Key)
+                .ToArray();
+            ValidateUniqueElements(tagNames, "tags");
+
+            IEnumerable<string> tagIds = platformTags
+                .Select(kvp => kvp.Value.Id)
+                .Where(id => id != null)
+                .ToArray();
+            ValidateUniqueElements(tagIds, "tag IDs");
+        }
+
+        private static void ValidateUniqueElements(IEnumerable<string> source, string elementsDescription)
+        {
+            if (source.Count() != source.Distinct().Count())
             {
-                IEnumerable<string> duplicateTags = allTags
+                IEnumerable<string> duplicates = source
                     .GroupBy(x => x)
                     .Where(x => x.Count() > 1)
                     .Select(x => x.Key);
-                throw new Exception(
-                    $"Duplicate tags found: {Environment.NewLine}{string.Join(Environment.NewLine, duplicateTags)}");
+                throw new ValidationException(
+                    $"Duplicate {elementsDescription} found: {Environment.NewLine}{string.Join(Environment.NewLine, duplicates)}");
             }
         }
     }

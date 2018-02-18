@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using Microsoft.DotNet.ImageBuilder.Model;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -26,7 +27,7 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
             ManifestInfo manifestInfo = new ManifestInfo();
             manifestInfo.Model = model;
             manifestInfo.ManifestFilter = manifestFilter;
-            manifestInfo.VariableHelper = new VariableHelper(model, optionVariables, manifestInfo.GetTagById);
+            manifestInfo.VariableHelper = new VariableHelper(model, optionVariables, repoOwner, manifestInfo.GetTagById);
             manifestInfo.Repos = manifestFilter.GetRepos(manifestInfo.Model)
                 .Select(repo => RepoInfo.Create(repo, manifestFilter, repoOwner, manifestInfo.VariableHelper))
                 .ToArray();
@@ -65,7 +66,7 @@ namespace Microsoft.DotNet.ImageBuilder.ViewModel
         public TagInfo GetTagById(string id)
         {
             return GetAllTags()
-                .Single(kvp => kvp.Model.Id == id);
+                .FirstOrDefault(kvp => kvp.Model.Id == id);
         }
 
         public IEnumerable<string> GetTestCommands()

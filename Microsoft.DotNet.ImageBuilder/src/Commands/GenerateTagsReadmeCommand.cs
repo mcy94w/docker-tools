@@ -22,14 +22,14 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
         public override Task ExecuteAsync()
         {
-            Utilities.WriteHeading("GENERATING TAGS README");
+            Logger.WriteHeading("GENERATING TAGS README");
             foreach (RepoInfo repo in Manifest.Repos)
             {
                 string tagsDoc = GetTagsDocumentation(repo);
 
-                Console.WriteLine($"-- {repo.Name} Tags Documentation:");
-                Console.WriteLine();
-                Console.WriteLine(tagsDoc);
+                Logger.WriteSubheading($"{repo.Name} Tags Documentation:");
+                Logger.WriteMessage();
+                Logger.WriteMessage(tagsDoc);
 
                 if (Options.UpdateReadme)
                 {
@@ -83,8 +83,15 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 tagsDoc.AppendLine();
                 foreach (var tuple in platformGroup)
                 {
-                    string tags = GetDocumentedTags(tuple.Platform.Tags)
-                        .Concat(GetDocumentedTags(tuple.Image.SharedTags))
+                    IEnumerable<string> documentedTags = GetDocumentedTags(tuple.Platform.Tags)
+                        .Concat(GetDocumentedTags(tuple.Image.SharedTags));
+
+                    if (!documentedTags.Any())
+                    {
+                        continue;
+                    }
+
+                    string tags = documentedTags
                         .Select(tag => $"`{tag}`")
                         .Aggregate((working, next) => $"{working}, {next}");
                     string dockerfile = tuple.Platform.DockerfilePath.Replace('\\', '/');
@@ -133,7 +140,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
         private static void UpdateReadme(string tagsDocumentation, RepoInfo repo)
         {
-            Utilities.WriteHeading("UPDATING README");
+            Logger.WriteHeading("UPDATING README");
 
             string readme = File.ReadAllText(repo.Model.ReadmePath);
 
@@ -145,8 +152,8 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             string updatedReadme = Regex.Replace(readme, "(# .*\\s*(- \\[.*\\s*)+)+", tagsDocumentation);
             File.WriteAllText(repo.Model.ReadmePath, updatedReadme);
 
-            Console.WriteLine($"-- Updated '{repo.Model.ReadmePath}'");
-            Console.WriteLine();
+            Logger.WriteSubheading($"Updated '{repo.Model.ReadmePath}'");
+            Logger.WriteMessage();
         }
     }
 }
