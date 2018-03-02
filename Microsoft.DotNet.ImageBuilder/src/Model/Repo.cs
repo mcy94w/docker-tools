@@ -14,6 +14,8 @@ namespace Microsoft.DotNet.ImageBuilder.Model
         [JsonProperty(Required = Required.Always)]
         public string Name { get; set; }
 
+        public string[] ReadmeOrder { get; set; }
+
         public string ReadmePath { get; set; }
 
         public Repo()

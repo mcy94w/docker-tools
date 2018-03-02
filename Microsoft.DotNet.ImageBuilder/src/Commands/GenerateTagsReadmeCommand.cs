@@ -57,19 +57,11 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             return displayName;
         }
 
-        private static IEnumerable<string> GetDocumentedTags(IEnumerable<TagInfo> tagInfos)
-        {
-            return tagInfos.Where(tag => !tag.Model.IsUndocumented)
-                .Select(tag => tag.Name);
-        }
-
         private string GetTagsDocumentation(RepoInfo repo)
         {
             StringBuilder tagsDoc = new StringBuilder();
 
-            var platformGroups = repo.Images
-                .OrderBy(image => image.Model.ReadmeOrder)
-                .SelectMany(image => image.Platforms.Select(platform => new { Image = image, Platform = platform }))
+            var platformGroups = GetOrderedImagePlatforms(repo)
                 .GroupBy(tuple => new { tuple.Platform.Model.OS, tuple.Platform.Model.OsVersion, tuple.Platform.Model.Architecture })
                 .OrderByDescending(platformGroup => platformGroup.Key.Architecture)
                 .ThenBy(platformGroup => platformGroup.Key.OS)
@@ -81,6 +73,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
                 string arch = GetArchitectureDisplayName(platformGroup.Key.Architecture);
                 tagsDoc.AppendLine($"# Supported {os} {arch} tags");
                 tagsDoc.AppendLine();
+
                 foreach (var tuple in platformGroup)
                 {
                     IEnumerable<string> documentedTags = GetDocumentedTags(tuple.Platform.Tags)
@@ -102,6 +95,38 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             }
 
             return tagsDoc.ToString();
+        }
+
+        private static IEnumerable<string> GetDocumentedTags(IEnumerable<TagInfo> tagInfos)
+        {
+            return tagInfos.Where(tag => !tag.Model.IsUndocumented)
+                .Select(tag => tag.Name);
+        }
+
+        private IEnumerable<ImagePlatformTuple> GetOrderedImagePlatforms(RepoInfo repo)
+        {
+            IEnumerable<ImagePlatformTuple> tuples = repo.Images
+                .SelectMany(image => image.Platforms.Select(platform => new ImagePlatformTuple(image, platform)));
+
+            switch (Options.Order)
+            {
+                case TagSortOrder.Manifest:
+                    if (repo.Model.ReadmeOrder != null)
+                    {
+                        tuples = SortTagsByManifestOrder(tuples, repo);
+                    }
+                    // else - use the order the images appear in the manifest
+                    break;
+                case TagSortOrder.DescendingVersionAscendingVariant:
+                    tuples = tuples
+                        .OrderByDescending(tuple => TagInfo.GetTagVersion(tuple.Platform.Tags.First().Name))
+                        .ThenBy(tuple => TagInfo.GetTagVariant(tuple.Platform.Tags.First().Name));
+                    break;
+                default:
+                    throw new NotSupportedException();
+            }
+
+            return tuples;
         }
 
         private static string GetOsDisplayName(OS os, string osVersion)
@@ -139,6 +164,18 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
             return value;
         }
 
+        private IEnumerable<ImagePlatformTuple> SortTagsByManifestOrder(IEnumerable<ImagePlatformTuple> tags, RepoInfo repo)
+        {
+            // TODO:  Exceptions
+            var sortedTags = new List<ImagePlatformTuple>();
+            foreach (string tag in repo.Model.ReadmeOrder)
+            {
+                sortedTags.Add(tags.Single(tuple => tuple.Platform.Tags.Where(ti => ti.Name == tag).Any()));
+            }
+
+            return sortedTags;
+        }
+
         private static void UpdateReadme(string tagsDocumentation, RepoInfo repo)
         {
             Logger.WriteHeading("UPDATING README");
@@ -155,6 +192,18 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
 
             Logger.WriteSubheading($"Updated '{repo.Model.ReadmePath}'");
             Logger.WriteMessage();
+        }
+
+        private class ImagePlatformTuple
+        {
+            public ImageInfo Image { get; }
+            public PlatformInfo Platform { get; }
+
+            public ImagePlatformTuple(ImageInfo image, PlatformInfo platform)
+            {
+                Image = image;
+                Platform = platform;
+            }
         }
     }
 }

@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using System.CommandLine;
 
 namespace Microsoft.DotNet.ImageBuilder.Commands
@@ -11,6 +12,7 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         protected override string CommandHelp => "Generate the tags section of the readme";
         protected override string CommandName => "generateTagsReadme";
 
+        public TagSortOrder Order { get; set; }
         public string SourceUrl { get; set; }
         public bool UpdateReadme { get; set; }
 
@@ -21,6 +23,14 @@ namespace Microsoft.DotNet.ImageBuilder.Commands
         public override void ParseCommandLine(ArgumentSyntax syntax)
         {
             base.ParseCommandLine(syntax);
+
+            TagSortOrder order = TagSortOrder.Manifest;
+            syntax.DefineOption(
+                "order",
+                ref order,
+                value => (TagSortOrder)Enum.Parse(typeof(TagSortOrder), value, true),
+                "Order to sort tags in (manifest, descendingVersionAscendingVariant)(default is manifest)");
+            Order = order;
 
             bool updateReadme = false;
             syntax.DefineOption("update-readme", ref updateReadme, "Update the readme file");
